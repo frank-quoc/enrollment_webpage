@@ -1,5 +1,9 @@
 # University Tech Academy Enrollment Page
 
+<p align="center">
+  <img src="/images/UTA_Enrollment_homepage.png" alt="UTA Banner"/>
+</p>
+
 [UTA Enrollment Tweet](https://twitter.com/culyTech/status/1366192836069056512)
 
 ## Table of Contents
