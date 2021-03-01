@@ -1,7 +1,9 @@
-from application import app, db
-from flask import render_template, request, json, Response, redirect, flash, url_for, session
+from application import app, db, api
+from flask import render_template, request, json, jsonify, Response, redirect, flash, url_for, session
 from application.models import User, Course, Enrollment
 from application.forms import LoginForm, RegisterForm
+from flask_restx import Resource
+from application.course_list import course_list
 
 course_data = [{"courseID":"1111","title":"PHP 111","description":"Intro to PHP","credits":"3",
 "term":"Fall, Spring"}, {"courseID":"2222","title":"Java 1",
@@ -10,6 +12,45 @@ course_data = [{"courseID":"1111","title":"PHP 111","description":"Intro to PHP"
 "term":"Fall"}, {"courseID":"4444","title":"Angular 1","description":"Intro to Angular",
 "credits":"3","term":"Fall, Spring"}, {"courseID":"5555","title":"Java 2",
 "description":"Advanced Java Programming","credits":"4","term":"Fall"}]
+
+###############################################
+
+@api.route('/api', '/api/') 
+class GetAndPost(Resource): 
+    
+    # GET ALL   
+    def get(self):         
+        return jsonify(User.objects.all())  
+
+    # POST
+    def post(self):
+        data = api.payload  # payload is from api_restx, so bottom fields provided by payload
+        user = User(user_id=data['user_id'], email=data['email'], first_name=data['first_name'],
+        last_name=data['last_name'])
+        user.set_password(data['password'])
+        user.save()
+        return jsonify(User.objects(user_id=data['user_id']))
+    
+@api.route('/api/<int:idx>') 
+class GetUpdateDelete(Resource): 
+    
+    # GET ONE    
+    def get(self, idx):         
+        return jsonify(User.objects(user_id=idx))
+
+    # PUT
+    def put(self, idx):
+        data = api.payload
+        User.objects(user_id=idx).update(**data) # **: packing upacking
+        return jsonify(User.objects(user_id=idx))
+
+    # DELETE
+    def delete(self, idx):
+        User.objects(user_id=idx).delete()
+        return jsonify("User is deleted!")
+
+
+################################################
 
 @app.route("/")
 @app.route("/index")
@@ -92,61 +133,19 @@ def enrollment():
             Enrollment(user_id=user_id, courseID=courseID).save()
             flash(f"You are enrolled in {courseTitle}!", "success")
 
-    classes = list(User.objects.aggregate(*[
-            {
-                '$lookup': {
-                    'from': 'enrollment', 
-                    'localField': 'user_id', 
-                    'foreignField': 'user_id', 
-                    'as': 'r1'
-                }
-            }, {
-                '$lookup': {
-                    'from': 'enrollment', 
-                    'localField': 'user_id', 
-                    'foreignField': 'user_id', 
-                    'as': 'r1'
-                }
-            }, {
-                '$unwind': {
-                    'path': '$r1', 
-                    'includeArrayIndex': 'r1_id', 
-                    'preserveNullAndEmptyArrays': False
-                }
-            }, {
-                '$lookup': {
-                    'from': 'course', 
-                    'localField': 'r1.courseID', 
-                    'foreignField': 'courseID', 
-                    'as': 'r2'
-                }
-            }, {
-                '$unwind': {
-                    'path': '$r2', 
-                    'preserveNullAndEmptyArrays': False
-                }
-            }, {
-                '$match': {
-                    'user_id': user_id
-                }
-            }, {
-                '$sort': {
-                    'courseID': 1
-                }
-            }
-        ]))
+    classes = course_list(user_id)
 
     return render_template("enrollment.html", enrollment=True, title="Enrollment", 
     classes=classes)
 
-@app.route("/api/")
-@app.route("/api/<int:idx>")
-def api(idx=None):
-    if idx == None:
-        jdata = course_data
-    else:
-        jdata = course_data[idx]
-    return Response(json.dumps(jdata), mimetype="application/json")
+# @app.route("/api/")
+# @app.route("/api/<int:idx>")
+# def api(idx=None):
+#     if idx == None:
+#         jdata = course_data
+#     else:
+#         jdata = course_data[idx]
+#     return Response(json.dumps(jdata), mimetype="application/json")
 
 @app.route("/user")
 def user():
